@@ -1,5 +1,4 @@
 import plotly.express as px
-import plotly.graph_objects as go
 import pandas as pd
 from dash import Dash, dcc, html, Input, Output
 import dash_bootstrap_components as dbc
@@ -10,11 +9,14 @@ import sample_lines
 from datetime import datetime as dt
 
 ### Enter your own filepath to the project
-image_directory = '/Users/mattsommer/Downloads/Project/taylor_wordclouds'
+image_directory = '/Users/mattsommer/Desktop/group6_ds3500/taylor_wordclouds'
 list_of_images = os.listdir(image_directory)
 static_image_route = '/static/'
 
 def process_scores(df):
+    '''
+    Calculates a % of scores that are positive from the pos/neg scores
+    '''
     pct_pos=[]
     for i in range(0, len(df)):
         if df['pos_scores'][i]+df['neg_scores'][i] == 0:
@@ -27,26 +29,41 @@ def process_scores(df):
 
 
 def read_df(filename):
+    '''
+    Reads in our dataframe, naming the columns we want and calling the process_scores function
+    '''
     df = pd.read_csv(filename)
     df.columns = ['idx', 'date', 'pos_scores', "neg_scores"]
     df['scores'] = process_scores(df)
     return df
 
+# Grabs the twitter sentiment time series for Taylor and makes a df from it
 main_df = read_df('taylor_swift_tsd_15')
+# Creates the computer generated Taylor lyrics
 taylor_fake, d_fake = sample_lines.ml()
 
 
 def extract_local_network(df, numobs, timeframe = [main_df.idx.min(), main_df.idx.max()]):
+    '''
+    For use in app callbacks, grabs a filtered version of the dataframe based on user inputs
+    '''
     df = match_idx()
     df = df[df.idx.between(timeframe[0], timeframe[1])]
     df['roll_avg'] = df.scores.rolling(numobs).mean()
     return df
 
 def buttons(csv):
+    '''
+    Returns a cleaned version of the album name, for use in our dashboard's album dropdown
+    '''
     df = pd.read_csv(csv)
     return df['Album Name']
 
 def make_marks(tick_len):
+    '''
+    Create x axis tick marks from the dataframe based on the length of
+    the data and size of the timeframe
+    '''
     i = 0
     mark_dict = {}
     jump = int(len(main_df)/tick_len)
@@ -61,6 +78,9 @@ def make_marks(tick_len):
 app = Dash(__name__, external_stylesheets=[dbc.themes.MINTY])
 
 def clean_label(i):
+    '''
+    Returns a cleaned version of the album name, for use in our dashboard's album dropdown
+    '''
     df = pd.read_csv("taylor.csv")
     in_disc = False
     for k in df["Album Name"]:
@@ -71,6 +91,10 @@ def clean_label(i):
         return " "
 
 def match_idx():
+    '''
+    Combines our datasets on Taylor, matching the datetime objects of his twitter sentiment
+    with when his albums were released.
+    '''
     album_col = []
     name_col = []
     df = pd.read_csv("taylor.csv")
@@ -93,10 +117,10 @@ def match_idx():
     main_df["name_col"] = name_col
     return(main_df)
 
+# Features to list as options in the spotify chart dropdowns
 graph_columns = ['danceability', 'energy', 'key', 'loudness', 'mode', 'speechiness',
-                 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'duration_ms',
-                 'track_name', 'age']
-
+                 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo',
+                 'track_name']
 # Define the dashboard layout
 app.layout = html.Div([
     dbc.Row(dbc.Col(dbc.Col(html.H2('Interactive Artist Dashboard Taylor'), className='text-center', width=12))),
@@ -123,6 +147,10 @@ app.layout = html.Div([
     dash.dependencies.Output('lyrics', 'children'),
     [dash.dependencies.Input('image-dropdown', 'value')])
 def update_lyrics(value):
+    '''
+    Takes in the selected album name from the dropdown and formats and returns the
+    filepath for the associated generated text
+    '''
     for k in taylor_fake.keys():
         comp_str = k+'wordcloud.jpg'
         if comp_str == value:
@@ -132,11 +160,17 @@ def update_lyrics(value):
     dash.dependencies.Output('image', 'src'),
     [dash.dependencies.Input('image-dropdown', 'value')])
 def update_image_src(value):
+    '''
+    Grabs the word cloud for the selected album and shows it on the left of the dashboard
+    '''
     return static_image_route + value
 
 # Add a static image route that serves images from desktop
 @app.server.route('{}<image_path>.jpg'.format(static_image_route))
 def serve_image(image_path):
+    '''
+    Formats the string of for the filepath of the wordcloud image being displayed
+    '''
     image_name = '{}.jpg'.format(image_path)
     if image_name not in list_of_images:
         raise Exception('"{}" is excluded from the allowed static files'.format(image_path))
@@ -148,6 +182,9 @@ def serve_image(image_path):
     Input("numobs", "value"),
 )
 def display_plot(timeframe, numobs):
+    '''
+    Creates the twitter sentiment time series plot to show on the left of the dashbaord
+    '''
     #modify dataframe
     local = extract_local_network(main_df, numobs, timeframe)
     #makes the sunspots over time figure
@@ -166,7 +203,10 @@ taylor_df = pd.read_csv('taylor_spotify.csv')
     Input('yfeat-dropdown', 'value')
 )
 def spotify_plot(album='1989', xfeat='acousticness', yfeat='danceability'):
-
+    '''
+    Creates the scatter plot of Spotify song features at the bottom of the dashbaord
+    Takes in dash inpyuts for which album to show songs from and which features to compare
+    '''
     dataframe = taylor_df
     album= clean_label(album)
     sub_df = dataframe[dataframe['album_name'] == album]
@@ -179,5 +219,6 @@ def spotify_plot(album='1989', xfeat='acousticness', yfeat='danceability'):
     fig.update_layout(yaxis_range=[0,1], xaxis_range=[0,1])
     return fig
 
-app.run_server(debug=True)
+if __name__ == '__main__':
+    app.run_server(debug=True)
 

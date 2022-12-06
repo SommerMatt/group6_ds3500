@@ -10,11 +10,14 @@ import sample_lines
 from datetime import datetime as dt
 
 ### Enter your own filepath to the project
-image_directory = '/Users/mattsommer/Downloads/Project/Drake_Clouds'
+image_directory = '/Users/mattsommer/Desktop/group6_ds3500/Drake_Clouds'
 list_of_images = os.listdir(image_directory)
 static_image_route = '/static/'
 
 def process_scores(df):
+    '''
+    Calculates a % of scores that are positive from the pos/neg scores
+    '''
     pct_pos=[]
     for i in range(0, len(df)):
         if df['pos_scores'][i]+df['neg_scores'][i] == 0:
@@ -27,22 +30,33 @@ def process_scores(df):
 
 
 def read_df(filename):
+    '''
+    Reads in our dataframe, naming the columns we want and calling the process_scores function
+    '''
     df = pd.read_csv(filename)
     df.columns = ['idx', 'date', 'pos_scores', "neg_scores"]
     df['scores'] = process_scores(df)
     return df
 
+# Grabs the twitter sentiment time series for Drake and makes a df from it
 drake_df = read_df('drake_tsd_15')
+# Creates the computer generated Drake lyrics
 ts_fake, drake_fake = sample_lines.ml()
 
 
 def extract_local_network(df, numobs, timeframe = [drake_df.idx.min(), drake_df.idx.max()]):
+    '''
+    For use in app callbacks, grabs a filtered version of the dataframe based on user inputs
+    '''
     df = match_idx()
     df = df[df.idx.between(timeframe[0],timeframe[1])]
     df['roll_avg'] = df.scores.rolling(numobs).mean()
     return df
 
 def clean_label(i):
+    '''
+    Returns a cleaned version of the album name, for use in our dashboard's album dropdown
+    '''
     df = pd.read_csv("drake.csv")
     in_disc = False
     for k in df["Album Name"]:
@@ -53,20 +67,28 @@ def clean_label(i):
         return " "
 
 def match_idx():
+    '''
+    Combines our datasets on drake, matching the datetime objects of his twitter sentiment
+    with when his albums were released.
+    '''
     album_col = []
     name_col = []
+    # Reading in album release dates
     df = pd.read_csv("drake.csv")
     for k in range(0, len(drake_df)-1):
+        # Getting the time frame of the twitter scores
         lower = dt.strptime(drake_df["date"][k], '%Y-%m-%d %H:%M:%S')
         upper = dt.strptime(drake_df["date"][k+1], '%Y-%m-%d %H:%M:%S')
         in_range = False
         for i in range(0, len(df)):
+            # For each album release, give a arbitrary value to that datetime index
             formatted = dt.strptime(df["Release Date"][i], '%Y-%m-%d')
             if formatted >= lower and  formatted <= upper:
                 in_range = True
                 album_col.append(100)
                 name_col.append(df["Album Name"][i])
                 print("TEST")
+        # For all other values, leave at 0
         if in_range == False:
             album_col.append(0)
             name_col.append(" ")
@@ -78,10 +100,17 @@ def match_idx():
     return(drake_df)
 
 def buttons(csv):
+    '''
+    Reads in our Drake csv and grabs the names of albums to use as options in the dashboard
+    '''
     df = pd.read_csv(csv)
     return df['Album Name']
 
 def make_marks(tick_len):
+    '''
+    Create x axis tick marks from the dataframe based on the length of
+    the data and size of the timeframe
+    '''
     i = 0
     mark_dict = {}
     jump = int(len(drake_df)/tick_len)
@@ -92,12 +121,20 @@ def make_marks(tick_len):
 
 
 def b64_image(image_filename):
+    '''
+    Reads in a b64 image at the given filepath,
+    used to display our premade wordclouds in the dashbaord
+    '''
     print('ran')
     with open(image_filename, 'rb') as f:
         image = f.read()
     return 'data:image/jpg;base64,' + base64.b64encode(image).decode('utf-8')
 
 def match_url(selection):
+    '''
+    Takes an album name and reformats it to make the structure of the
+    corresponding image filepath
+    '''
     df = pd.read_csv('drake.csv')
     for i in range(0, len(df['Album Name'])):
         if df['Album Name'][i] == selection:
@@ -107,10 +144,10 @@ def match_url(selection):
 # Build an App using external style sheets to place graphs next to each other and add theme
 external_stylesheets = [dbc.themes.SUPERHERO]
 app = Dash(__name__, external_stylesheets=external_stylesheets)
-
+# Features to list as options in the spotify chart dropdowns
 graph_columns = ['danceability', 'energy', 'key', 'loudness', 'mode', 'speechiness',
-                 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'duration_ms',
-                 'track_name', 'age']
+                 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo',
+                 'track_name']
 
 # Define the dashboard layout
 app.layout = html.Div([
@@ -140,6 +177,9 @@ app.layout = html.Div([
     dash.dependencies.Output('image', 'src'),
     [dash.dependencies.Input('image-dropdown', 'value')])
 def update_image_src(value):
+    '''
+    Grabs the word cloud for the selected album and shows it on the left of the dashboard
+    '''
     return static_image_route + value
 
 # Add a static image route that serves images from desktop
@@ -147,6 +187,9 @@ def update_image_src(value):
 # from your computer or server
 @app.server.route('{}<image_path>.jpg'.format(static_image_route))
 def serve_image(image_path):
+    '''
+    Formats the string of for the filepath of the wordcloud image being displayed
+    '''
     image_name = '{}.jpg'.format(image_path)
     if image_name not in list_of_images:
         raise Exception('"{}" is excluded from the allowed static files'.format(image_path))
@@ -158,15 +201,21 @@ def serve_image(image_path):
     Input("numobs", "value"),
 )
 def display_plot(timeframe, numobs):
+    '''
+    Creates the twitter sentiment time series plot to show on the left of the dashbaord
+    '''
     #modify dataframe
     local = extract_local_network(drake_df, numobs, timeframe)
     #makes the sunspots over time figure
-    fig = px.line(local, x='idx', y=['scores', 'roll_avg', "album_col"],
+    fig = px.line(local, x='idx', y=['scores', 'roll_avg'],
                   title="Twitter Sentiment of Drake Over Time", hover_data=["name_col", "date"])
+    sub_local = local[local['album_col'] > 0].index
+    for idx in sub_local:
+        fig.add_vline(x=idx, line_width=1, line_dash="dash", line_color="green")
+
     fig.update_layout(hovermode='x unified', xaxis_title='Date',
                       yaxis_title='Percent Positive Language')
     fig.update_layout({'paper_bgcolor': 'rgba(0,0,0,0)', 'plot_bgcolor': 'rgba(0,0,0,0)'})
-
     return fig
 
 spotify_df = pd.read_csv('drake_spotify.csv')
@@ -177,11 +226,16 @@ spotify_df = pd.read_csv('drake_spotify.csv')
     Input('yfeat-dropdown', 'value')
 )
 def spotify_plot(album, xfeat='acousticness', yfeat='danceability'):
-
+    '''
+    Creates the scatter plot of Spotify song features at the bottom of the dashbaord
+    Takes in dash inpyuts for which album to show songs from and which features to compare
+    '''
+    # Filters data
     dataframe = spotify_df
     album = clean_label(album)
     sub_df = dataframe[dataframe['album_name'] == album]
 
+    # Creates and returns scatter plot
     fig = px.scatter(sub_df, x=xfeat, y=yfeat, color="track_name",
                      size='duration_ms', hover_data=['track_name'], title="Feature Comparison of Songs from {}".format(album))
     fig.update_layout(showlegend=False)
@@ -189,4 +243,5 @@ def spotify_plot(album, xfeat='acousticness', yfeat='danceability'):
     fig.update_layout(yaxis_range=[0, 1], xaxis_range=[0, 1])
     return fig
 
-app.run_server(debug=True)
+if __name__ == '__main__':
+    app.run_server(debug=True)
