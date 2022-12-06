@@ -1,0 +1,57 @@
+.Select-control {
+    background-color: #DEAB90 !important;
+    color: #8A5A44;
+  }
+
+.Select-menu-outer {
+    background-color: #DEAB90;
+    color: #8A5A44;
+}
+
+.Select-value-label {
+    color: #8A5A44 !important;
+}
+
+body {
+    background-color: #EDC4B3;
+    color: #8A5A44;
+}
+
+H2 {
+    background-color: #CD9777;
+    color: #8A5A44;
+}
+
+H4 {
+    background-color: #EDC4B3;
+    color: #774936;
+}
+
+
+H3, H6 {
+    background-color: #E6B8A2;
+    color: #8A5A44;
+}
+
+.rc-slider-track {
+  background-color: #8A5A44;
+}
+
+.rc-slider-dot-active {
+  border-color: #8A5A44;
+  border: solid 2px #8A5A44;
+}
+
+.rc-slider-handle {
+  background-color: #8A5A44;
+  border-color: #8A5A44;
+}
+
+.rc-slider-handle:hover {
+  border-color: #8A5A44;
+}
+
+.rc-slider-handle-active:active {
+  border-color: #8A5A44;
+}
+
