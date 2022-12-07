@@ -15,10 +15,14 @@
 body {
     background-color: #EDC4B3;
     color: #8A5A44;
+    margin-left: 40px;
+    margin-right: 40px;
+    margin-top: 10px;
+    margin-bottom: 40px;
 }
 
 H2 {
-    background-color: #CD9777;
+    background-color: #EDC4B3;
     color: #8A5A44;
 }
 
@@ -54,4 +58,3 @@ H3, H6 {
 .rc-slider-handle-active:active {
   border-color: #8A5A44;
 }
-
