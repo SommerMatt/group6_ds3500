@@ -7,9 +7,10 @@ import os
 import flask
 import sample_lines
 from datetime import datetime as dt
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 ### Enter your own filepath to the project
-image_directory = '/Users/mattsommer/Desktop/group6_ds3500/taylor_wordclouds'
+image_directory = '/Users/angel/DS3500/group6_ds3500-main/taylor_wordclouds'
 list_of_images = os.listdir(image_directory)
 static_image_route = '/static/'
 
@@ -123,7 +124,7 @@ graph_columns = ['danceability', 'energy', 'key', 'loudness', 'mode', 'speechine
                  'track_name']
 # Define the dashboard layout
 app.layout = html.Div([
-    dbc.Row(dbc.Col(dbc.Col(html.H2('Interactive Artist Dashboard Taylor'), className='text-center', width=12))),
+    dbc.Row(dbc.Col(dbc.Col(html.H2('Interactive Artist Dashboard: Taylor Swift'), className='text-center', width=12))),
     dcc.Dropdown(id='image-dropdown', options=[{'label': clean_label(i), 'value': i} for i in list_of_images],
                      value=list_of_images[0]),
     dbc.Row([dbc.Col(dcc.Graph(id="graph",style={'width':'45vw', 'height':'45vh'},
@@ -137,6 +138,7 @@ app.layout = html.Div([
             dcc.Slider(1, 10, 1, value=5, id='numobs'),
             html.H3("Machine Learning of Taylor Swift's albums"),
             html.H6(id = 'lyrics'),
+            dcc.Graph(id='pie'),
             dcc.Graph(id='graph_spotify'),
             html.H6('Select X and Y Features'),
             dcc.Dropdown(id='xfeat-dropdown', options=graph_columns, value='acousticness'),
@@ -183,17 +185,47 @@ def serve_image(image_path):
 )
 def display_plot(timeframe, numobs):
     '''
-    Creates the twitter sentiment time series plot to show on the left of the dashbaord
+    Creates the twitter sentiment time series plot to show on the left of the dashboard
     '''
-    #modify dataframe
+    # modify dataframe
     local = extract_local_network(main_df, numobs, timeframe)
-    #makes the sunspots over time figure
+    # makes the sunspots over time figure
     fig = px.line(local, x='idx', y=['scores', 'roll_avg', "album_col"],
-                  title="Twitter Sentiment of Taylor Swift Over Time", hover_data=["name_col", "date"])
+                  title="Twitter Sentiment of Taylor Swift Over Time", hover_data=["name_col", "date"],
+                  color_discrete_sequence=px.colors.sequential.RdBu)
     fig.update_layout(hovermode='x unified', xaxis_title='Date',
                   yaxis_title='Percent Positive Language')
     fig.update_layout({'paper_bgcolor': 'rgba(0,0,0,0)','plot_bgcolor':'rgba(0,0,0,0)'})
     return fig
+
+@app.callback(
+    Output("pie", "figure"),
+    Input('image-dropdown', 'value')
+)
+def update_pie(album):
+    """
+    Creates a sentiment pie plot for machine learning generated lyrics for user selected album.
+    """
+    lyrics = []
+    for k in taylor_fake.keys():
+        comp_str = k+'wordcloud.jpg'
+        if comp_str == album:
+            lyrics = taylor_fake[k]
+    sentiment = SentimentIntensityAnalyzer()
+    neg = 0
+    neu = 0
+    pos = 0
+    for l in lyrics:
+        sent = sentiment.polarity_scores(l)
+        neg += sent['neg']
+        neu += sent['neu']
+        pos += sent['pos']
+    df = pd.DataFrame.from_dict({'neg':neg,'neu':neu,'pos':pos},orient='index',columns=['value'])
+    fig = px.pie(df, values ='value', names=['negative','neutral','positive'], title="Sentiment Analysis of Machine Learning Lyrics",
+                 color_discrete_sequence=px.colors.sequential.RdBu)
+    fig.update_layout({'paper_bgcolor': 'rgba(0,0,0,0)', 'plot_bgcolor': 'rgba(0,0,0,0)'})
+    return fig
+
 
 taylor_df = pd.read_csv('taylor_spotify.csv')
 @app.callback(
@@ -203,17 +235,17 @@ taylor_df = pd.read_csv('taylor_spotify.csv')
     Input('yfeat-dropdown', 'value')
 )
 def spotify_plot(album='1989', xfeat='acousticness', yfeat='danceability'):
-    '''
-    Creates the scatter plot of Spotify song features at the bottom of the dashbaord
-    Takes in dash inpyuts for which album to show songs from and which features to compare
-    '''
+    """
+    Creates the scatter plot of Spotify song features at the bottom of the dashboard
+    Takes in dash inputs for which album to show songs from and which features to compare
+    """
     dataframe = taylor_df
     album= clean_label(album)
     sub_df = dataframe[dataframe['album_name'] == album]
 
     fig = px.scatter(sub_df, x=xfeat, y=yfeat, color="track_name",
                      size='duration_ms', hover_data=['track_name'],
-                     title="Feature Comparison of Songs from {}".format(album), )
+                     title="Feature Comparison of Songs from {}".format(album), color_discrete_sequence=px.colors.sequential.RdBu)
     fig.update_layout(showlegend=False)
     fig.update_layout({'paper_bgcolor': 'rgba(0,0,0,0)','plot_bgcolor':'rgba(0,0,0,0)'})
     fig.update_layout(yaxis_range=[0,1], xaxis_range=[0,1])
